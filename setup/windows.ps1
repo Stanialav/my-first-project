@@ -91,8 +91,10 @@ $vbs = Join-Path $HelperDir 'pull.vbs'
 $command = '"' + $GitExe + '" -C "' + $Target + '" pull --ff-only -q'
 $vbsText = 'CreateObject("WScript.Shell").Run "' + ($command -replace '"', '""') + '", 0, False'
 [IO.File]::WriteAllText($vbs, $vbsText, [Text.Encoding]::Unicode)
-schtasks /Create /F /SC MINUTE /MO 10 /TN $TaskName /TR "wscript.exe `"$vbs`"" | Out-Null
-if ($LASTEXITCODE -ne 0) { Fail 'Не удалось создать задачу обновления в Планировщике заданий.' }
+$action   = New-ScheduledTaskAction -Execute 'wscript.exe' -Argument ('"' + $vbs + '"')
+$trigger  = New-ScheduledTaskTrigger -Once -At (Get-Date) -RepetitionInterval (New-TimeSpan -Minutes 10) -RepetitionDuration (New-TimeSpan -Days 3650)
+$settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable -ExecutionTimeLimit (New-TimeSpan -Minutes 5)
+Register-ScheduledTask -TaskName $TaskName -Action $action -Trigger $trigger -Settings $settings -Force | Out-Null
 
 $chats = Join-Path $Target 'chats'
 Write-Host @"
