@@ -1,6 +1,2 @@
-.obsidian/*
-!.obsidian/community-plugins.json
-!.obsidian/plugins/
-.obsidian/plugins/*
-!.obsidian/plugins/obsidian-git/
+.obsidian/
 .trash/

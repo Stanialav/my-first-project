@@ -1,99 +1,88 @@
 #!/usr/bin/env bash
-# Скачивает хранилище чатов на компьютер и подключает его к Obsidian.
+# Подключает чаты Cursor к уже существующему хранилищу Obsidian и обновляет их каждые 10 минут.
+# Настройки Obsidian, плагины и остальные заметки не меняются.
 # Запуск: curl -fsSL https://cdn.jsdelivr.net/gh/Stanialav/my-first-project@main/setup/mac-linux.sh | bash
 set -euo pipefail
 
 REPO_URL="${REPO_URL:-https://github.com/Stanialav/my-first-project.git}"
 BRANCH="${BRANCH:-main}"
-DEST="${DEST:-$HOME/Documents/my-first-project}"
-PLUGIN_URL="https://github.com/Vinzent03/obsidian-git/releases/latest/download"
-VAULT_NAME="$(basename "$DEST")"
+VAULT="${VAULT:-Stas}"
+SUBFOLDER="${SUBFOLDER:-Входящие/Cursor}"
+VAULT_PATH="${VAULT_PATH:-}"
 
 step() { printf '\n==> %s\n' "$1"; }
 fail() { printf '\nОШИБКА: %s\n' "$1" >&2; exit 1; }
 
 case "$(uname -s)" in
-  Darwin) OS=mac; OBSIDIAN_CONFIG="$HOME/Library/Application Support/obsidian/obsidian.json" ;;
-  *)      OS=linux; OBSIDIAN_CONFIG="${XDG_CONFIG_HOME:-$HOME/.config}/obsidian/obsidian.json" ;;
+  Darwin) OBSIDIAN_CONFIG="$HOME/Library/Application Support/obsidian/obsidian.json" ;;
+  *)      OBSIDIAN_CONFIG="${XDG_CONFIG_HOME:-$HOME/.config}/obsidian/obsidian.json" ;;
 esac
 
 step "Проверяю Git"
 if ! git --version >/dev/null 2>&1; then
-  if [ "$OS" = mac ]; then
+  if [ "$(uname -s)" = Darwin ]; then
     xcode-select --install || true
     fail "Сейчас откроется окно установки инструментов разработчика (в них есть Git). Нажми «Установить», дождись конца и запусти эту команду ещё раз."
   fi
   fail "Git не установлен. Установи его (например: sudo apt install git) и запусти эту команду ещё раз."
 fi
 
-step "Проверяю Obsidian"
-if [ "$OS" = mac ] && [ ! -d /Applications/Obsidian.app ] && [ ! -d "$HOME/Applications/Obsidian.app" ]; then
-  if command -v brew >/dev/null 2>&1; then
-    brew install --cask obsidian
-  else
-    echo "Obsidian не найден. Скачай его с https://obsidian.md и установи. Хранилище всё равно будет подготовлено."
+step "Ищу хранилище Obsidian «$VAULT»"
+if [ -z "$VAULT_PATH" ] && [ -f "$OBSIDIAN_CONFIG" ] && command -v python3 >/dev/null 2>&1; then
+  VAULT_PATH="$(python3 - "$OBSIDIAN_CONFIG" "$VAULT" <<'PY'
+import json, os, sys
+with open(sys.argv[1], encoding="utf-8") as fh:
+    vaults = json.load(fh).get("vaults", {})
+found = [v["path"] for v in vaults.values() if os.path.basename(v.get("path", "").rstrip("/")) == sys.argv[2]]
+print(found[0] if len(found) == 1 else "")
+PY
+)"
+fi
+if [ -z "$VAULT_PATH" ]; then
+  printf 'Не нашёл хранилище «%s». Вставь полный путь к папке хранилища: ' "$VAULT"
+  read -r VAULT_PATH </dev/tty
+fi
+[ -d "$VAULT_PATH" ] || fail "Папка $VAULT_PATH не найдена."
+[ -d "$VAULT_PATH/.obsidian" ] || echo "Внимание: в $VAULT_PATH нет папки .obsidian. Проверь, что это хранилище Obsidian."
+echo "Хранилище: $VAULT_PATH"
+
+TARGET="$VAULT_PATH/$SUBFOLDER"
+step "Подключаю чаты в $TARGET"
+if [ -d "$TARGET/.git" ]; then
+  git -C "$TARGET" pull --ff-only
+elif [ -d "$TARGET" ] && [ -n "$(ls -A "$TARGET")" ]; then
+  fail "Папка $TARGET уже есть и в ней что-то лежит. Ничего не трогаю: переименуй её или укажи другую папку."
+else
+  mkdir -p "$TARGET"
+  git -C "$TARGET" init -q
+  git -C "$TARGET" remote add origin "$REPO_URL"
+  git -C "$TARGET" config core.sparseCheckout true
+  printf '/chats/\n' > "$TARGET/.git/info/sparse-checkout"
+  git -C "$TARGET" fetch -q --depth 50 origin "$BRANCH"
+  git -C "$TARGET" checkout -q -B "$BRANCH" --track "origin/$BRANCH"
+fi
+
+if [ -d "$VAULT_PATH/.git" ]; then
+  RULE="/$SUBFOLDER/"
+  if ! grep -qxF "$RULE" "$VAULT_PATH/.gitignore" 2>/dev/null; then
+    if [ -s "$VAULT_PATH/.gitignore" ] && [ -n "$(tail -c1 "$VAULT_PATH/.gitignore")" ]; then
+      echo >> "$VAULT_PATH/.gitignore"
+    fi
+    echo "$RULE" >> "$VAULT_PATH/.gitignore"
+    echo "Хранилище само под Git, поэтому добавил $RULE в его .gitignore."
   fi
 fi
 
-step "Скачиваю папку в $DEST"
-mkdir -p "$(dirname "$DEST")"
-if [ -d "$DEST/.git" ]; then
-  git -C "$DEST" pull --ff-only
-elif [ -e "$DEST" ]; then
-  fail "Папка $DEST уже существует и это не копия репозитория. Переименуй её и запусти команду ещё раз."
-else
-  git clone --branch "$BRANCH" "$REPO_URL" "$DEST"
-fi
-[ -d "$DEST/chats" ] || fail "В репозитории нет папки chats/. Сначала нажми «Merge» в pull request на GitHub."
-
-step "Проверяю плагин Obsidian Git"
-PLUGIN_DIR="$DEST/.obsidian/plugins/obsidian-git"
-mkdir -p "$PLUGIN_DIR"
-for f in main.js manifest.json styles.css; do
-  [ -f "$PLUGIN_DIR/$f" ] || curl -fsSL --max-time 60 "$PLUGIN_URL/$f" -o "$PLUGIN_DIR/$f"
-done
-
-step "Добавляю хранилище в Obsidian"
-if pgrep -xi obsidian >/dev/null 2>&1; then
-  echo "Obsidian сейчас открыт, поэтому список хранилищ не изменён."
-  echo "Закрой Obsidian и запусти команду ещё раз, или открой папку вручную: «Открыть папку как хранилище» → $DEST"
-elif command -v python3 >/dev/null 2>&1; then
-  python3 - "$OBSIDIAN_CONFIG" "$DEST" <<'PY'
-import json, os, secrets, sys, time
-config, dest = sys.argv[1], os.path.abspath(sys.argv[2])
-data = {}
-if os.path.exists(config):
-    with open(config, encoding="utf-8") as fh:
-        data = json.load(fh)
-vaults = data.setdefault("vaults", {})
-for v in vaults.values():
-    v.pop("open", None)
-existing = next((v for v in vaults.values() if os.path.abspath(v.get("path", "")) == dest), None)
-if existing is None:
-    existing = vaults.setdefault(secrets.token_hex(8), {"path": dest})
-existing["ts"] = int(time.time() * 1000)
-existing["open"] = True
-os.makedirs(os.path.dirname(config), exist_ok=True)
-with open(config, "w", encoding="utf-8") as fh:
-    json.dump(data, fh, ensure_ascii=False)
-PY
-  echo "Готово: хранилище «$VAULT_NAME» добавлено."
-else
-  echo "Не нашёл python3. Открой папку вручную: Obsidian → «Открыть папку как хранилище» → $DEST"
-fi
-
-step "Открываю Obsidian"
-URI="obsidian://open?vault=$(python3 -c 'import sys,urllib.parse;print(urllib.parse.quote(sys.argv[1]))' "$VAULT_NAME" 2>/dev/null || echo "$VAULT_NAME")"
-if [ "$OS" = mac ]; then
-  open "$URI" 2>/dev/null || true
-else
-  (xdg-open "$URI" >/dev/null 2>&1 &) || true
-fi
+step "Включаю обновление каждые 10 минут"
+GIT_BIN="$(command -v git)"
+CRON_LINE="*/10 * * * * \"$GIT_BIN\" -C \"$TARGET\" pull --ff-only -q >/dev/null 2>&1 # cursor-chats-pull"
+{ crontab -l 2>/dev/null | grep -v '# cursor-chats-pull' || true; echo "$CRON_LINE"; } | crontab -
 
 cat <<EOF
 
 Всё готово.
-- Папка: $DEST
-- Если Obsidian спросит, доверять ли плагинам этого хранилища, нажми «Доверять автору и включить плагины».
-- Новые чаты от агентов будут подтягиваться при запуске Obsidian и каждые 10 минут.
+- Чаты лежат в хранилище «$VAULT»: $TARGET/chats
+- В Obsidian они появятся сами, открывать ничего не нужно.
+- Обновление: задача cron каждые 10 минут.
+- Остальные заметки, настройки и плагины Obsidian не тронуты.
 EOF
