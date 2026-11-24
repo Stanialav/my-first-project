@@ -30,6 +30,21 @@
 - **Вариант B:** отдельный репозиторий только под Obsidian, например `obsidian-vault`, куда агенты пишут заметки.
 - **Вариант C:** скачивать папку вручную и копировать её в хранилище.
 
+## Установка на компьютер (делается один раз)
+
+1. На GitHub в pull request нажать «Merge».
+2. Windows: нажать Пуск, ввести `PowerShell`, открыть его и вставить:
+   ```
+   irm https://raw.githubusercontent.com/Stanialav/my-first-project/main/setup/windows.ps1 | iex
+   ```
+   macOS: открыть «Терминал» и вставить:
+   ```
+   curl -fsSL https://raw.githubusercontent.com/Stanialav/my-first-project/main/setup/mac-linux.sh | bash
+   ```
+3. Когда Obsidian откроется и спросит про плагины, нажать «Trust author and enable plugins» («Доверять автору и включить плагины»).
+
+Скрипт сам ставит Git и Obsidian, если их нет, скачивает папку в «Документы/my-first-project», включает плагин Obsidian Git (pull при запуске и каждые 10 минут) и открывает хранилище.
+
 ## Итог и что дальше
 
-Нужно выбрать вариант структуры и способ синхронизации с Obsidian. По умолчанию работает вариант 1 + A.
+Работает вариант 1 + A. Структуру можно поменять позже.
