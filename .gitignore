@@ -3,6 +3,4 @@
 !.obsidian/plugins/
 .obsidian/plugins/*
 !.obsidian/plugins/obsidian-git/
-.obsidian/plugins/obsidian-git/*
-!.obsidian/plugins/obsidian-git/data.json
 .trash/

@@ -35,12 +35,13 @@
 1. На GitHub в pull request нажать «Merge».
 2. Windows: нажать Пуск, ввести `PowerShell`, открыть его и вставить:
    ```
-   irm https://raw.githubusercontent.com/Stanialav/my-first-project/main/setup/windows.ps1 | iex
+   [Net.ServicePointManager]::SecurityProtocol = 'Tls12'; iex ([Text.Encoding]::UTF8.GetString((iwr -UseBasicParsing https://cdn.jsdelivr.net/gh/Stanialav/my-first-project@main/setup/windows.ps1).RawContentStream.ToArray()))
    ```
    macOS: открыть «Терминал» и вставить:
    ```
-   curl -fsSL https://raw.githubusercontent.com/Stanialav/my-first-project/main/setup/mac-linux.sh | bash
+   curl -fsSL https://cdn.jsdelivr.net/gh/Stanialav/my-first-project@main/setup/mac-linux.sh | bash
    ```
+   Адрес `raw.githubusercontent.com` в России часто заблокирован, поэтому скрипт скачивается через jsDelivr. Плагин Obsidian Git лежит прямо в репозитории, так что дальше нужен только доступ к `github.com`.
 3. Когда Obsidian откроется и спросит про плагины, нажать «Trust author and enable plugins» («Доверять автору и включить плагины»).
 
 Скрипт сам ставит Git и Obsidian, если их нет, скачивает папку в «Документы/my-first-project», включает плагин Obsidian Git (pull при запуске и каждые 10 минут) и открывает хранилище.

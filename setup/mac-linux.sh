@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Скачивает хранилище чатов на компьютер и подключает его к Obsidian.
-# Запуск: curl -fsSL https://raw.githubusercontent.com/Stanialav/my-first-project/main/setup/mac-linux.sh | bash
+# Запуск: curl -fsSL https://cdn.jsdelivr.net/gh/Stanialav/my-first-project@main/setup/mac-linux.sh | bash
 set -euo pipefail
 
 REPO_URL="${REPO_URL:-https://github.com/Stanialav/my-first-project.git}"
@@ -46,11 +46,11 @@ else
 fi
 [ -d "$DEST/chats" ] || fail "В репозитории нет папки chats/. Сначала нажми «Merge» в pull request на GitHub."
 
-step "Устанавливаю плагин Obsidian Git"
+step "Проверяю плагин Obsidian Git"
 PLUGIN_DIR="$DEST/.obsidian/plugins/obsidian-git"
 mkdir -p "$PLUGIN_DIR"
 for f in main.js manifest.json styles.css; do
-  curl -fsSL "$PLUGIN_URL/$f" -o "$PLUGIN_DIR/$f"
+  [ -f "$PLUGIN_DIR/$f" ] || curl -fsSL --max-time 60 "$PLUGIN_URL/$f" -o "$PLUGIN_DIR/$f"
 done
 
 step "Добавляю хранилище в Obsidian"

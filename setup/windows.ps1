@@ -1,7 +1,8 @@
 # Скачивает хранилище чатов на компьютер и подключает его к Obsidian.
-# Запуск в PowerShell:
-#   irm https://raw.githubusercontent.com/Stanialav/my-first-project/main/setup/windows.ps1 | iex
+# Запуск в PowerShell (jsDelivr открывается там, где raw.githubusercontent.com заблокирован):
+#   [Net.ServicePointManager]::SecurityProtocol = 'Tls12'; iex ([Text.Encoding]::UTF8.GetString((iwr -UseBasicParsing https://cdn.jsdelivr.net/gh/Stanialav/my-first-project@main/setup/windows.ps1).RawContentStream.ToArray()))
 $ErrorActionPreference = 'Stop'
+Write-Host 'Скрипт скачан, начинаю установку.' -ForegroundColor Cyan
 
 $RepoUrl   = if ($env:REPO_URL) { $env:REPO_URL } else { 'https://github.com/Stanialav/my-first-project.git' }
 $Branch    = if ($env:BRANCH)   { $env:BRANCH }   else { 'main' }
@@ -49,11 +50,13 @@ if (Test-Path (Join-Path $Dest '.git')) {
 if ($LASTEXITCODE -ne 0) { Fail 'Не удалось скачать репозиторий.' }
 if (-not (Test-Path (Join-Path $Dest 'chats'))) { Fail 'В репозитории нет папки chats/. Сначала нажми «Merge» в pull request на GitHub.' }
 
-Step 'Устанавливаю плагин Obsidian Git'
+Step 'Проверяю плагин Obsidian Git'
 $PluginDir = Join-Path $Dest '.obsidian\plugins\obsidian-git'
 New-Item -ItemType Directory -Force -Path $PluginDir | Out-Null
 foreach ($f in 'main.js', 'manifest.json', 'styles.css') {
-    Invoke-WebRequest -UseBasicParsing -Uri "$PluginUrl/$f" -OutFile (Join-Path $PluginDir $f)
+    if (-not (Test-Path (Join-Path $PluginDir $f))) {
+        Invoke-WebRequest -UseBasicParsing -TimeoutSec 60 -Uri "$PluginUrl/$f" -OutFile (Join-Path $PluginDir $f)
+    }
 }
 
 Step 'Добавляю хранилище в Obsidian'
