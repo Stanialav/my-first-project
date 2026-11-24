@@ -87,7 +87,7 @@ URI="obsidian://open?vault=$(python3 -c 'import sys,urllib.parse;print(urllib.pa
 if [ "$OS" = mac ]; then
   open "$URI" 2>/dev/null || true
 else
-  xdg-open "$URI" >/dev/null 2>&1 || true
+  (xdg-open "$URI" >/dev/null 2>&1 &) || true
 fi
 
 cat <<EOF
